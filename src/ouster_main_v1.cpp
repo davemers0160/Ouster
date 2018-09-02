@@ -2,6 +2,7 @@
 #include<winsock2.h>
 #pragma comment(lib,"ws2_32.lib") //Winsock Library
 #define _USE_MATH_DEFINES
+#define _CRT_SECURE_NO_WARNINGS
 #include <win_network_fcns.h>
 #else
 

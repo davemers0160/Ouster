@@ -15,21 +15,32 @@
 cmake_minimum_required(VERSION 2.8.12)
 
 PROJECT(Lidar_Project)
-
 set(exe_name "ouster_client")
 
-include(../cmake_utils/use_cpp_11.cmake)
-include(../cmake_utils/use_sse_avx.cmake)
+set(PLATFORM "$ENV{PLATFORM}" CACHE INTERNAL "Copied from environment variable")
+
+message("Platform: " ${PLATFORM})
+
+if(${PLATFORM} STREQUAL "Laptop")
+    set(COMMON_ROOT "D:/Common")
+
+elseif(${PLATFORM} STREQUAL "MainGear")
+    set(COMMON_ROOT "~/Common")
+
+elseif(${PLATFORM} STREQUAL "HPC")
+    set(COMMON_ROOT "$HOME/Common")
+endif()
+
+include(${COMMON_ROOT}/cmake_utils/use_cpp_11.cmake)
+include(${COMMON_ROOT}/cmake_utils/use_sse_avx.cmake)
 
 #include_directories("include")
 
 # grab all of the *.c and *.cpp files in the src directory
-file(GLOB SOURCES "src/*.c" 
-			SOURCES "src/*.cpp" 
-			SOURCES "../common/*.cpp"
-			SOURCES "../common/*.c")
+file(GLOB SOURCES "src/*.cpp" 
+        )
 
-set(project_includes "../common" "include")
+set(project_includes "include" "${COMMON_ROOT}/include")
             
 message("")
 message("--------------------------------------------------------")
@@ -66,6 +77,8 @@ if(WIN32)
     message("MSVC Version: " ${MSVC_VERSION})
     # uncomment for MSVC and cmake greater than 3.6.0
     if(MSVC AND (${CMAKE_VERSION} VERSION_GREATER "3.6.0"))
+        set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} /MP)
+        set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} /MP)
         set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${exe_name})
     endif()
 endif()
