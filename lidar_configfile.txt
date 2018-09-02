@@ -1,0 +1,16 @@
+# Ouster Lidar configuration file
+#
+# Parameters should be supplied in the following order:
+# 1. lidar ip address
+# 2. lidar config port
+# 3. lidar data port
+# 4. lidar imu port
+# 5. receiving ip address
+# 6. save path
+
+10.127.1.175
+7501
+7502
+7503
+10.127.1.29
+../results/
