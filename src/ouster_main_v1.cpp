@@ -1,6 +1,6 @@
 #if defined(_WIN32) | defined(__WIN32__) | defined(__WIN32) | defined(_WIN64) | defined(__WIN64)
-#include<winsock2.h>
-#pragma comment(lib,"ws2_32.lib") //Winsock Library
+//#include<winsock2.h>
+//#pragma comment(lib,"ws2_32.lib") //Winsock Library
 #define _USE_MATH_DEFINES
 #define _CRT_SECURE_NO_WARNINGS
 #include <win_network_fcns.h>
@@ -371,12 +371,13 @@ int main(int argc, char *argv[])
 
                 }
 
+                cv::Mat rng_tm2, ref_tm2;
+
                 std::cout << ":" << std::endl << std::endl;
-                //sum_image.convertTo(sum_image, CV_32FC1, (1 / (double)capture_num));
+                sum_image.convertTo(rng_tm2, CV_32SC1, (1 / (double)capture_num));
                 //cv::medianBlur(sum_image, sum_image, 3);
 
-                cv::Mat rng_tm2, ref_tm2;
-                time_median_cv(rng_tm, rng_tm2);
+                //time_median_cv(rng_tm, rng_tm2);
                 time_median_cv(ref_tm, ref_tm2);
 
                 // write the size of the data
