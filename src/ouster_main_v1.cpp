@@ -413,6 +413,7 @@ int main(int argc, char *argv[])
     }
 
     cv::destroyAllWindows();
+    std::cout << "Program Complete!" << std::endl;
 
     return 0;
 }   // end of main
