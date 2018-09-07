@@ -1,16 +1,14 @@
 # Ouster Lidar configuration file
 #
 # Parameters should be supplied in the following order:
-# 1. lidar ip address
-# 2. lidar config port
-# 3. lidar data port
-# 4. lidar imu port
-# 5. receiving ip address
-# 6. save path
+# Line 1: lidar ip address
+# Line 2: lidar ports: config port, lidar data port, imu port
+# Line 3: receiving ip address
+# Line 4: number of lidar captures to average
+# Line 5: save path
 
 10.127.1.175
-7501
-7502
-7503
+7501, 7502, 7503
 10.127.1.101
+11
 D:/IUPUI/Test_Data/Real_World/Library1/lidar/

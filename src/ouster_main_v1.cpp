@@ -35,7 +35,7 @@
 #include "path_check.h"
 #include "file_parser.h"
 #include "get_current_time.h"
-
+#include "write_binary_image.h"
 
 namespace OS1 = ouster::OS1;
 
@@ -64,7 +64,8 @@ bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::strin
     result = init_tcp_socket(lidar_ip_address, config_port, os1_cfg_socket, error_msg);
     if (result != 0)
     {
-        std::cout << "Error Code (" << result << "): " << error_msg << std::endl;
+        //std::cout << "Error Code (" << result << "): " << error_msg << std::endl;
+        error_msg = "Error Code " + num2str(result, "(%03d): ") + error_msg;
         return false;
     }
 
@@ -122,7 +123,7 @@ void get_lidar_packet(uint32_t s)
     uint32_t measurement_id, range, reflect;
     uint32_t index = 0;
     uint32_t col_idx = 0;
-    uint32_t encoder;
+    //uint32_t encoder;
 
     do 
     {
@@ -167,6 +168,8 @@ int main(int argc, char *argv[])
     std::string rng_capture_name = "lidar_range_";
     std::string ref_capture_name = "lidar_ref_";
     std::string sdate, stime;
+    std::ofstream DataLogStream;
+    std::string log_filename = "lidar_capture_log_";
 
     FILE *FP1, *FP2;
 
@@ -176,14 +179,15 @@ int main(int argc, char *argv[])
     std::fill(index_tracker.begin(), index_tracker.end(), 0);
 
     const std::string params =
-        "{help h ?    |                   | Help message                             }"
-        "{rx_address  | 10.127.1.29       | IP Address for the lidar to send data to }"
-        "{os1_address | 10.127.1.175      | IP address for the lidar                 }"
-        "{cfg_port    | 7501              | TCP/IP Port for lidar configuration      }"
-        "{lidar_port  | 7502              | UDP Port to receive lidar Stream         }"
-        "{imu_port    | 7503              | UDP Port for the IMU data                }"
+        "{help h ?    | | Help message }"
+        "{rx_address  | 10.127.1.101 | IP Address for the lidar to send data to }"
+        "{os1_address | 10.127.1.175 | IP address for the lidar }"
+        "{cfg_port    | 7501 | TCP/IP Port for lidar configuration }"
+        "{lidar_port  | 7502 | UDP Port to receive lidar Stream }"
+        "{imu_port    | 7503 | UDP Port for the IMU data }"
         "{cfg_file    |  | Alternate input method to supply all parameters, all parameters must be included in the file }"
-        "{output      | ../results/       | Output directory to save lidar images    }"
+        "{avg         | 11 | Number of full lidar captures to average }"
+        "{output      | ../results/ | Output directory to save lidar images }"
         ;
 
     // use opencv's command line parser
@@ -210,14 +214,15 @@ int main(int argc, char *argv[])
         std::vector<std::vector<std::string>> cfg_params;
         parseCSVFile(cfg_filename, cfg_params);
 
-        if (cfg_params.size() == 6)
+        if (cfg_params.size() == 5)
         {
             os1_address = cfg_params[0][0];
             config_port = std::stoi(cfg_params[1][0]);
-            lidar_port = std::stoi(cfg_params[2][0]);
-            imu_port = std::stoi(cfg_params[3][0]);
-            rx_address = cfg_params[4][0];
-            save_path = cfg_params[5][0];
+            lidar_port = std::stoi(cfg_params[1][1]);
+            imu_port = std::stoi(cfg_params[1][2]);
+            rx_address = cfg_params[2][0];
+            capture_num = std::stoi(cfg_params[3][0]);
+            save_path = cfg_params[4][0];
         }
         else
         {
@@ -233,27 +238,52 @@ int main(int argc, char *argv[])
         config_port = parser.get<int32_t>("cfg_port");
         lidar_port = parser.get<int32_t>("lidar_port");
         imu_port = parser.get<int32_t>("imu_port");
+        capture_num = parser.get<uint32_t>("avg");
         save_path = parser.get<std::string>("output");
     }
 
     path_check(save_path);
 
+    get_current_time(sdate, stime);
+    log_filename = log_filename + sdate + "_" + stime + ".txt";
+
+    std::cout << "Log File: " << (save_path + log_filename) << std::endl << std::endl;
+    DataLogStream.open((save_path + log_filename), ios::out | ios::app);
+
+    // Add the date and time to the start of the log file
+    DataLogStream << "------------------------------------------------------------------" << std::endl;
+    DataLogStream << "Version: 1.0    Date: " << sdate << "    Time: " << stime << std::endl;
+    DataLogStream << "------------------------------------------------------------------" << std::endl;
+
+
     std::cout << "Running lidar capture using the following parameters:" << std::endl;
-    std::cout << "Lidar IP Address:     " << os1_address << std::endl;
-    std::cout << "Config Port:          " << config_port << std::endl;
-    std::cout << "Data Port:            " << lidar_port << std::endl;
-    std::cout << "IMU Port:             " << imu_port << std::endl;
+    std::cout << "Lidar IP Address:       " << os1_address << std::endl;
+    std::cout << "Config Port:            " << config_port << std::endl;
+    std::cout << "Data Port:              " << lidar_port << std::endl;
+    std::cout << "IMU Port:               " << imu_port << std::endl;
     std::cout << std::endl;
-    std::cout << "Receiving IP Address: " << rx_address << std::endl;
-    std::cout << "Save Path:            " << save_path << std::endl;
+    std::cout << "Receiving IP Address:   " << rx_address << std::endl;
+    std::cout << "Average Capture Number: " << capture_num << std::endl;
+    std::cout << "Save Path:              " << save_path << std::endl;
     std::cout << std::endl;
+
+    DataLogStream << "Running lidar capture using the following parameters:" << std::endl;
+    DataLogStream << "Lidar IP Address:       " << os1_address << std::endl;
+    DataLogStream << "Config Port:            " << config_port << std::endl;
+    DataLogStream << "Data Port:              " << lidar_port << std::endl;
+    DataLogStream << "IMU Port:               " << imu_port << std::endl;
+    DataLogStream << std::endl;
+    DataLogStream << "Receiving IP Address:   " << rx_address << std::endl;
+    DataLogStream << "Average Capture Number: " << capture_num << std::endl;
+    DataLogStream << "Save Path:              " << save_path << std::endl;
+    DataLogStream << "------------------------------------------------------------------" << std::endl;
 
 //-----------------------------------------------------------------------------
 //  Main Program
 //-----------------------------------------------------------------------------
 
 #if defined(_WIN32) | defined(__WIN32__) | defined(__WIN32) | defined(_WIN64) | defined(__WIN64)
-    SOCKET os1_cfg_socket;
+    //SOCKET os1_cfg_socket;
 
     SOCKET os1_data_socket;
     SOCKADDR_IN lidar_data_sock_add = {};
@@ -280,7 +310,10 @@ int main(int argc, char *argv[])
         bool success = config_lidar(os1_address, config_port, std::to_string(lidar_port), std::to_string(imu_port), rx_address, error_msg);
         if (success == false)
         {
-            std::cout << "Error Code: " << error_msg << std::endl;
+            //std::cout << "Error Code: " << error_msg << std::endl;
+            std::cout << error_msg << std::endl;
+            DataLogStream << error_msg << std::endl;
+            DataLogStream.close();
             std::cin.ignore();
             return -1;
         }
@@ -292,6 +325,8 @@ int main(int argc, char *argv[])
         if (result != 0)
         {
             std::cout << "Error Code: " << result << " - " << error_msg << std::endl;
+            DataLogStream << error_msg << std::endl;
+            DataLogStream.close(); 
             std::cin.ignore();
             return -1;
         }
@@ -336,6 +371,10 @@ int main(int argc, char *argv[])
                 std::string ref_save_name = save_path + ref_capture_name + num2str(count, "%05d_") + sdate + "_" + stime + ".bin";
                 std::cout << "Saving range data to: " << rng_save_name << std::endl;
                 std::cout << "Saving reflectivity data to: " << ref_save_name << std::endl;
+                DataLogStream << "Saving range data to: " << rng_save_name << std::endl;
+                DataLogStream << "Saving reflectivity data to: " << ref_save_name << std::endl;
+                DataLogStream << "------------------------------------------------------------------" << std::endl;
+
                 FP1 = fopen(rng_save_name.c_str(), "wb");
                 FP2 = fopen(ref_save_name.c_str(), "wb");
 
@@ -373,7 +412,9 @@ int main(int argc, char *argv[])
 
                 cv::Mat rng_tm2, ref_tm2;
 
-                std::cout << ":" << std::endl << std::endl;
+                std::cout << ":" << std::endl;
+                std::cout << "------------------------------------------------------------------" << std::endl;
+                
                 sum_image.convertTo(rng_tm2, CV_32SC1, (1 / (double)capture_num));
                 //cv::medianBlur(sum_image, sum_image, 3);
 
@@ -387,11 +428,13 @@ int main(int argc, char *argv[])
                 fwrite(&ref_tm2.cols, sizeof(uint32_t), 1, FP2);
 
                 // write the data
-                fwrite(rng_tm2.data, rng_tm2.rows*rng_tm2.cols, sizeof(int32_t), FP1);
-                fwrite(ref_tm2.data, ref_tm2.rows*ref_tm2.cols, sizeof(int32_t), FP2);
+                fwrite(rng_tm2.data, sizeof(int32_t), rng_tm2.rows*rng_tm2.cols, FP1);
+                fwrite(ref_tm2.data, sizeof(int32_t), ref_tm2.rows*ref_tm2.cols, FP2);
 
                 fclose(FP1);
                 fclose(FP2);
+
+                //write_binary_image(rng_save_name.c_str(), rng_tm2);
 
                 ++count;
                 int bp = 0;
@@ -409,12 +452,15 @@ int main(int argc, char *argv[])
     catch (std::exception e)
     {
         std::cout << "Error: " << e.what() << std::endl;
+        DataLogStream << "Error: " << e.what() << std::endl;
+
         std::cin.ignore();
     }
 
+    DataLogStream.close();
+
     cv::destroyAllWindows();
     std::cout << "Program Complete!" << std::endl;
-
     return 0;
 }   // end of main
 
