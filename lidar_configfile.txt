@@ -11,4 +11,4 @@
 7501, 7502, 7503
 10.127.1.101
 11
-D:/IUPUI/Test_Data/Real_World/Library1/lidar/
+D:/IUPUI/Test_Data/Real_World/Roof_Top1/lidar/
