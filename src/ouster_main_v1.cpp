@@ -51,7 +51,7 @@ cv::Mat reflect_px = cv::Mat(lidar_height, lidar_width, CV_32SC1, cv::Scalar::al
 std::vector<uint32_t> index_tracker(lidar_width);
 //-----------------------------------------------------------------------------
 
-bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::string lidar_port, std::string imu_port, std::string ip_address, std::string &error_msg)
+bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::string lidar_port, std::string imu_port, std::string ip_address, std::vector<std::string> &lidar_info, std::string &error_msg)
 {
     uint32_t result;
     std::string operation, value;
@@ -59,50 +59,67 @@ bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::strin
     std::string rx_message;
     bool success = true;
 
+    lidar_info.clear();
+    error_msg = "";
+
 #if defined(_WIN32) | defined(__WIN32__) | defined(__WIN32) | defined(_WIN64) | defined(__WIN64)
     SOCKET os1_cfg_socket;
     result = init_tcp_socket(lidar_ip_address, config_port, os1_cfg_socket, error_msg);
     if (result != 0)
     {
         //std::cout << "Error Code (" << result << "): " << error_msg << std::endl;
-        error_msg = "Error Code " + num2str(result, "(%03d): ") + error_msg;
+        error_msg = "Error Code " + num2str(result, "(%03d): ") + error_msg + "\n";
         return false;
+    }
+
+    // get the basic info about the lidar unit
+    operation = "get_sensor_info";
+    result = send_message(os1_cfg_socket, operation, message);
+    receive_message(os1_cfg_socket, 305, rx_message);
+    if (rx_message.length() > 0)
+    {
+        std::vector<std::string> params, params2;
+        parseCSVLine(rx_message, params);
+        for (uint32_t idx = 0; idx < params.size()-1; ++idx)
+        {
+            parse_line(params[idx], ':', params2);
+            std::string info = params2[1];
+            lidar_info.push_back(info.substr(1, info.length() - 2));
+        }
     }
 
     // begin configuring the lidar
     operation = "set_udp_port_lidar";
-    result = send_message(os1_cfg_socket, operation, lidar_port, message);
+    result = send_message(os1_cfg_socket, (operation + " " + lidar_port), message);
     receive_message(os1_cfg_socket, 64, rx_message);
     if (rx_message != operation)
     {
         success &= false;
+        error_msg = error_msg + "set_udp_port_lidar did not match\n";
     }
 
     operation = "set_udp_port_imu";
-    result = send_message(os1_cfg_socket, operation, imu_port, message);
+    result = send_message(os1_cfg_socket, (operation + " " + imu_port), message);
     receive_message(os1_cfg_socket, 64, rx_message);
     if (rx_message != operation)
     {
         success &= false;
+        error_msg = error_msg + "set_udp_port_imu did not match\n";
     }
 
     operation = "set_udp_ip";
-    result = send_message(os1_cfg_socket, operation, ip_address, message);
+    result = send_message(os1_cfg_socket, (operation + " " + ip_address), message);
     receive_message(os1_cfg_socket, 64, rx_message);
     if (rx_message != operation)
     {
         success &= false;
-    }
-
-    operation = "set_udp_ip";
-    result = send_message(os1_cfg_socket, operation, ip_address, message);
-    receive_message(os1_cfg_socket, 64, rx_message);
-    if (rx_message != operation)
-    {
-        success &= false;
+        error_msg = error_msg + "set_udp_ip did not match\n";
     }
 
     result = close_connection(os1_cfg_socket, error_msg);
+
+#else
+    // linux code to be inserted later
 
 #endif
 
@@ -165,16 +182,16 @@ int main(int argc, char *argv[])
     std::string error_msg;
     uint32_t capture_num = 11;
     uint32_t count = 0;
-    std::string rng_capture_name = "lidar_range_";
+    std::string rng_capture_name = "lidar_rng_";
     std::string ref_capture_name = "lidar_ref_";
     std::string sdate, stime;
     std::ofstream DataLogStream;
     std::string log_filename = "lidar_capture_log_";
+    std::vector<std::string> lidar_info;
 
     FILE *FP1, *FP2;
 
     cv::Mat lidar_combined_map = cv::Mat(2 * lidar_height, lidar_width, CV_32SC1, cv::Scalar::all(0));
-    cv::Mat sum_image = cv::Mat(cv::Size(lidar_width,lidar_height), CV_32SC1, cv::Scalar::all(0));
 
     std::fill(index_tracker.begin(), index_tracker.end(), 0);
 
@@ -276,7 +293,6 @@ int main(int argc, char *argv[])
     DataLogStream << "Receiving IP Address:   " << rx_address << std::endl;
     DataLogStream << "Average Capture Number: " << capture_num << std::endl;
     DataLogStream << "Save Path:              " << save_path << std::endl;
-    DataLogStream << "------------------------------------------------------------------" << std::endl;
 
 //-----------------------------------------------------------------------------
 //  Main Program
@@ -307,18 +323,25 @@ int main(int argc, char *argv[])
     {
 #if defined(_WIN32) | defined(__WIN32__) | defined(__WIN32) | defined(_WIN64) | defined(__WIN64)
         // config the lidar to start sending lidar packets
-        bool success = config_lidar(os1_address, config_port, std::to_string(lidar_port), std::to_string(imu_port), rx_address, error_msg);
+        bool success = config_lidar(os1_address, config_port, std::to_string(lidar_port), std::to_string(imu_port), rx_address, lidar_info, error_msg);
         if (success == false)
         {
-            //std::cout << "Error Code: " << error_msg << std::endl;
+            std::cout << "Lidar configuration failed..." << std::endl;
             std::cout << error_msg << std::endl;
             DataLogStream << error_msg << std::endl;
             DataLogStream.close();
             std::cin.ignore();
             return -1;
         }
-        std::cout << "Configuring lidar successful." << std::endl << std::endl;
+        std::cout << "Configuring lidar successful!" << std::endl;
+        if (lidar_info.size() > 3)
+        {
+            std::cout << "Connected to lidar sn: " << lidar_info[2] << std::endl;
+            DataLogStream << "Lidar SN:               " << lidar_info[2] << std::endl;
+        }
+        DataLogStream << "------------------------------------------------------------------" << std::endl;
 
+        std::cout << std::endl;
 
         // initialize the lidar socket stream
         result = init_udp_socket(lidar_port, lidar_data_sock_add, os1_data_socket, error_msg);
@@ -339,7 +362,6 @@ int main(int argc, char *argv[])
 #else
 
 #endif
-
 
         char key;
         std::string depthmapWindow = "Lidar Reflectivity/Range Map";
@@ -365,14 +387,16 @@ int main(int argc, char *argv[])
             // check to save the image
             if (key == 's')
             {
+                cv::Mat sum_image = cv::Mat(cv::Size(lidar_width, lidar_height), CV_32SC1, cv::Scalar::all(0));
+
                 std::vector<cv::Mat> rng_tm, ref_tm;
                 get_current_time(sdate, stime);
                 std::string rng_save_name = save_path + rng_capture_name + num2str(count, "%05d_") + sdate + "_" + stime + ".bin";
                 std::string ref_save_name = save_path + ref_capture_name + num2str(count, "%05d_") + sdate + "_" + stime + ".bin";
                 std::cout << "Saving range data to: " << rng_save_name << std::endl;
                 std::cout << "Saving reflectivity data to: " << ref_save_name << std::endl;
-                DataLogStream << "Saving range data to: " << rng_save_name << std::endl;
-                DataLogStream << "Saving reflectivity data to: " << ref_save_name << std::endl;
+                DataLogStream << rng_save_name << std::endl;
+                DataLogStream << ref_save_name << std::endl;
                 DataLogStream << "------------------------------------------------------------------" << std::endl;
 
                 FP1 = fopen(rng_save_name.c_str(), "wb");
