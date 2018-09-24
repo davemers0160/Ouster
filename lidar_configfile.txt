@@ -11,4 +11,5 @@
 7501, 7502, 7503
 10.127.1.101
 11
-D:/IUPUI/Test_Data/Real_World/House2/lidar/
+D:/IUPUI/Test_Data/Real_World/Grass2/lidar/
+#../results/
