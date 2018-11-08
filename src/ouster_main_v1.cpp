@@ -9,7 +9,7 @@
 #else
 #include <linux_network_fcns.h>
 #include <cstdint>
-#typedet SOCKET int32_t
+typedef int32_t SOCKET;
 
 #endif
 
