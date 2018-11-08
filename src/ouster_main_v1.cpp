@@ -448,7 +448,7 @@ int main(int argc, char *argv[])
         std::cout << std::endl;
 
         // initialize the lidar socket stream
-        result = init_udp_socket(lidar_port, lidar_data_sock_add, os1_data_socket, error_msg);
+        result = init_udp_socket(lidar_port, os1_data_socket, error_msg);
         if (result != 0)
         {
             std::cout << "Error Code: " << result << " - " << error_msg << std::endl;
