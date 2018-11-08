@@ -21,14 +21,10 @@ set(PLATFORM "$ENV{PLATFORM}" CACHE INTERNAL "Copied from environment variable")
 
 message("Platform: " ${PLATFORM})
 
-if(${PLATFORM} STREQUAL "Laptop")
+if(WIN32)
     set(COMMON_ROOT "D:/Common")
-
-elseif(${PLATFORM} STREQUAL "MainGear")
+else()
     set(COMMON_ROOT "~/Common")
-
-elseif(${PLATFORM} STREQUAL "HPC")
-    set(COMMON_ROOT "$HOME/Common")
 endif()
 
 include(${COMMON_ROOT}/cmake_utils/use_cpp_11.cmake)
