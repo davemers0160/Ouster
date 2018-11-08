@@ -47,6 +47,11 @@ endforeach()
 message("--------------------------------------------------------")
 message("")
 
+if(WIN32)
+else()
+    find_package(Threads REQUIRED)
+endif()
+
 # find OpenCV
 find_package(OpenCV REQUIRED)
 if (OpenCV_FOUND)
@@ -63,7 +68,7 @@ if (OpenCV_FOUND)
     
     include_directories(${project_includes})
 	add_executable(${exe_name} ${SOURCES})
-	target_link_libraries(${exe_name} ${OpenCV_LIBS})
+	target_link_libraries(${exe_name} ${OpenCV_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
 else()
 	message("OpenCV not found, so we won't build the project.")
@@ -76,6 +81,8 @@ if(WIN32)
         target_compile_options(${exe_name} PRIVATE "/MP")
         set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${exe_name})
     endif()
+else()
+    target_compile_options(${exe_name} PUBLIC "-pthread")
 endif()
 
 message("Build Complete!")

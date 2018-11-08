@@ -8,6 +8,8 @@
 
 #else
 #include <linux_network_fcns.h>
+#include <pthread.h>
+
 #include <cstdint>
 typedef int32_t SOCKET;
 
@@ -127,7 +129,7 @@ bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::strin
     result = init_tcp_socket(lidar_ip_address, config_port, os1_cfg_socket, error_msg);
     if (result != 0)
     {
-        error_msg = "Error Code " + num2str(result, "(%03d): ") + error_msg + "\n";
+        error_msg = "Error Initializing TCP Socket: " + num2str(result, "(%03d): ") + error_msg + "\n";
         return false;
     }
     
@@ -184,13 +186,16 @@ bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::strin
 
 //-----------------------------------------------------------------------------
 
-// #if defined(_WIN32) | defined(__WIN32__) | defined(__WIN32) | defined(_WIN64) | defined(__WIN64)
-// void get_lidar_packet(SOCKET s)
-// #else
-// void get_lidar_packet(uint32_t s)
-// #endif
+#if defined(_WIN32) | defined(__WIN32__) | defined(__WIN32) | defined(_WIN64) | defined(__WIN64)
 void get_lidar_packet(SOCKET s)
 {
+#else
+void *get_lidar_packet(void *input)
+{
+
+    SOCKET s = (SOCKET)input;    
+#endif
+
     uint8_t lidar_packet[packet_size+1];
     int32_t result, error;
     uint32_t measurement_id, range, reflect;
@@ -377,16 +382,15 @@ int main(int argc, char *argv[])
     lidar_imu_sock_add.sin_port = htons(imu_port);
 #else
     SOCKET os1_data_socket;
-
-
     SOCKET os1_imu_socket;
+
+    pthread_t receiving;
     
 #endif
 
-
-
     try
     {
+
 #if defined(_WIN32) | defined(__WIN32__) | defined(__WIN32) | defined(_WIN64) | defined(__WIN64)
         // config the lidar to start sending lidar packets
         bool success = config_lidar(os1_address, config_port, std::to_string(lidar_port), std::to_string(imu_port), rx_address, lidar_info, error_msg);
@@ -448,7 +452,7 @@ int main(int argc, char *argv[])
         std::cout << std::endl;
 
         // initialize the lidar socket stream
-        result = init_udp_socket(lidar_port, lidar_data_sock_add, os1_data_socket, error_msg);
+        result = init_udp_socket(lidar_port, os1_data_socket, error_msg);
         if (result != 0)
         {
             std::cout << "Error Code: " << result << " - " << error_msg << std::endl;
@@ -461,8 +465,13 @@ int main(int argc, char *argv[])
         std::cout << "Socket initialization successful." << std::endl << std::endl;
 
         running = true;
-        std::thread receiving(get_lidar_packet, os1_data_socket);
-        receiving.detach();
+        int rx_thread = pthread_create(&receiving, NULL, get_lidar_packet, (void*)(&os1_data_socket));
+        if(rx_thread == -1)
+        {
+            std::cout << "Error creating LIDAR data thread." << std::endl;
+        }
+        //std::thread receiving(get_lidar_packet, os1_data_socket);
+        //receiving.detach();
 
 #endif
 
@@ -573,7 +582,11 @@ int main(int argc, char *argv[])
 
         sleep_ms(1000);         // delay for a second to let the lidar thread come to a complete stop
 
+#if defined(_WIN32) | defined(__WIN32__) | defined(__WIN32) | defined(_WIN64) | defined(__WIN64)
         receiving.~thread();
+#else
+        pthread_join(receiving, NULL);
+#endif
 
     }
     catch (std::exception e)
