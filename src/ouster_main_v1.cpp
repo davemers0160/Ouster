@@ -1,15 +1,19 @@
+
 #if defined(_WIN32) | defined(__WIN32__) | defined(__WIN32) | defined(_WIN64) | defined(__WIN64)
-//#include<winsock2.h>
-//#pragma comment(lib,"ws2_32.lib") //Winsock Library
+
 #define _USE_MATH_DEFINES
 #define _CRT_SECURE_NO_WARNINGS
 #include <win_network_fcns.h>
+#include <cstdint>
+
 #else
+#include <linux_network_fcns.h>
+#include <cstdint>
+#typedet SOCKET int32_t
 
 #endif
 
 #include <cstdio>
-#include <cstdint>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
@@ -24,7 +28,6 @@
 #include <opencv2/core/utility.hpp>
 #include <opencv2/highgui/highgui.hpp>     
 #include <opencv2/imgproc/imgproc.hpp> 
-//#include <opencv2/core/mat.hpp>
 
 // Custum Includes
 #include "os1_packet.h"
@@ -119,8 +122,60 @@ bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::strin
     result = close_connection(os1_cfg_socket, error_msg);
 
 #else
-    // linux code to be inserted later
+    // linux code
+    SOCKET os1_cfg_socket;
+    result = init_tcp_socket(lidar_ip_address, config_port, os1_cfg_socket, error_msg);
+    if (result != 0)
+    {
+        error_msg = "Error Code " + num2str(result, "(%03d): ") + error_msg + "\n";
+        return false;
+    }
+    
+    // get the basic info about the lidar unit
+    operation = "get_sensor_info";
+    result = send_message(os1_cfg_socket, operation, message);
+    receive_message(os1_cfg_socket, 305, rx_message);
+    if (rx_message.length() > 0)
+    {
+        std::vector<std::string> params, params2;
+        parseCSVLine(rx_message, params);
+        for (uint32_t idx = 0; idx < params.size()-1; ++idx)
+        {
+            parse_line(params[idx], ':', params2);
+            std::string info = params2[1];
+            lidar_info.push_back(info.substr(1, info.length() - 2));
+        }
+    }
 
+    // begin configuring the lidar
+    operation = "set_udp_port_lidar";
+    result = send_message(os1_cfg_socket, (operation + " " + lidar_port), message);
+    receive_message(os1_cfg_socket, 64, rx_message);
+    if (rx_message != operation)
+    {
+        success &= false;
+        error_msg = error_msg + "set_udp_port_lidar did not match\n";
+    }
+
+    operation = "set_udp_port_imu";
+    result = send_message(os1_cfg_socket, (operation + " " + imu_port), message);
+    receive_message(os1_cfg_socket, 64, rx_message);
+    if (rx_message != operation)
+    {
+        success &= false;
+        error_msg = error_msg + "set_udp_port_imu did not match\n";
+    }
+
+    operation = "set_udp_ip";
+    result = send_message(os1_cfg_socket, (operation + " " + ip_address), message);
+    receive_message(os1_cfg_socket, 64, rx_message);
+    if (rx_message != operation)
+    {
+        success &= false;
+        error_msg = error_msg + "set_udp_ip did not match\n";
+    }
+
+    result = close_connection(os1_cfg_socket, error_msg);    
 #endif
 
     return success;
@@ -129,11 +184,12 @@ bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::strin
 
 //-----------------------------------------------------------------------------
 
-#if defined(_WIN32) | defined(__WIN32__) | defined(__WIN32) | defined(_WIN64) | defined(__WIN64)
+// #if defined(_WIN32) | defined(__WIN32__) | defined(__WIN32) | defined(_WIN64) | defined(__WIN64)
+// void get_lidar_packet(SOCKET s)
+// #else
+// void get_lidar_packet(uint32_t s)
+// #endif
 void get_lidar_packet(SOCKET s)
-#else
-void get_lidar_packet(uint32_t s)
-#endif
 {
     uint8_t lidar_packet[packet_size+1];
     int32_t result, error;
@@ -144,13 +200,20 @@ void get_lidar_packet(uint32_t s)
 
     do 
     {
+#if defined(_WIN32) | defined(__WIN32__) | defined(__WIN32) | defined(_WIN64) | defined(__WIN64)
         result = recvfrom(s, (char *)lidar_packet, packet_size, 0, NULL, NULL);
         if (result == SOCKET_ERROR) {
             error = WSAGetLastError();
             std::cout << "Receive failed. Error: " << error << std::endl;
             continue;
         }
-        
+#else
+        result = recvfrom(s, (char *)lidar_packet, packet_size, 0, NULL, NULL);
+        if (result == -1) {
+            std::cout << "Receive failed... " << std::endl;
+            continue;
+        }    
+#endif    
         for (uint32_t col = 0; col < 16; ++col)
         {
             col_idx = col * OS1::column_bytes;
@@ -313,8 +376,11 @@ int main(int argc, char *argv[])
     lidar_imu_sock_add.sin_addr.s_addr = INADDR_ANY;
     lidar_imu_sock_add.sin_port = htons(imu_port);
 #else
-    int32_t os1_socket;
+    SOCKET os1_data_socket;
 
+
+    SOCKET os1_imu_socket;
+    
 #endif
 
 
@@ -360,6 +426,43 @@ int main(int argc, char *argv[])
         std::thread receiving(get_lidar_packet, os1_data_socket);
         receiving.detach();
 #else
+        // config the lidar to start sending lidar packets
+        bool success = config_lidar(os1_address, config_port, std::to_string(lidar_port), std::to_string(imu_port), rx_address, lidar_info, error_msg);
+        if (success == false)
+        {
+            std::cout << "Lidar configuration failed..." << std::endl;
+            std::cout << error_msg << std::endl;
+            DataLogStream << error_msg << std::endl;
+            DataLogStream.close();
+            std::cin.ignore();
+            return -1;
+        }
+        std::cout << "Configuring lidar successful!" << std::endl;
+        if (lidar_info.size() > 3)
+        {
+            std::cout << "Connected to lidar sn: " << lidar_info[2] << std::endl;
+            DataLogStream << "Lidar SN:               " << lidar_info[2] << std::endl;
+        }
+        DataLogStream << "------------------------------------------------------------------" << std::endl;
+
+        std::cout << std::endl;
+
+        // initialize the lidar socket stream
+        result = init_udp_socket(lidar_port, lidar_data_sock_add, os1_data_socket, error_msg);
+        if (result != 0)
+        {
+            std::cout << "Error Code: " << result << " - " << error_msg << std::endl;
+            DataLogStream << error_msg << std::endl;
+            DataLogStream.close();
+            std::cin.ignore();
+            return -1;
+        }
+
+        std::cout << "Socket initialization successful." << std::endl << std::endl;
+
+        running = true;
+        std::thread receiving(get_lidar_packet, os1_data_socket);
+        receiving.detach();
 
 #endif
 
