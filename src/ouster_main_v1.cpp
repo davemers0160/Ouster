@@ -193,7 +193,8 @@ void get_lidar_packet(SOCKET s)
 void *get_lidar_packet(void *input)
 {
 
-    SOCKET s = (SOCKET)input;    
+    SOCKET *s;
+    s = (SOCKET *)input;    
 #endif
 
     uint8_t lidar_packet[packet_size+1];
@@ -213,12 +214,13 @@ void *get_lidar_packet(void *input)
             continue;
         }
 #else
-        result = recvfrom(s, (char *)lidar_packet, packet_size, 0, NULL, NULL);
+        result = recvfrom(*s, (char *)lidar_packet, packet_size, 0, NULL, NULL);
         if (result == -1) {
             std::cout << "Receive failed... " << std::endl;
             continue;
         }    
-#endif    
+#endif
+
         for (uint32_t col = 0; col < 16; ++col)
         {
             col_idx = col * OS1::column_bytes;
@@ -238,6 +240,12 @@ void *get_lidar_packet(void *input)
         }
 
     } while (running == true);
+
+#if defined(_WIN32) | defined(__WIN32__) | defined(__WIN32) | defined(_WIN64) | defined(__WIN64)
+
+#else
+    pthread_exit(NULL);
+#endif
 
 }   // end of get_lidar_packet
 
@@ -429,6 +437,7 @@ int main(int argc, char *argv[])
         running = true;
         std::thread receiving(get_lidar_packet, os1_data_socket);
         receiving.detach();
+
 #else
         // config the lidar to start sending lidar packets
         bool success = config_lidar(os1_address, config_port, std::to_string(lidar_port), std::to_string(imu_port), rx_address, lidar_info, error_msg);
@@ -470,6 +479,7 @@ int main(int argc, char *argv[])
         {
             std::cout << "Error creating LIDAR data thread." << std::endl;
         }
+        pthread_detach(receiving);
         //std::thread receiving(get_lidar_packet, os1_data_socket);
         //receiving.detach();
 
