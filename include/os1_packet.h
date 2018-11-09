@@ -58,8 +58,8 @@ static trig_table_entry trig_table[pixels_per_column];
 
 static bool init_tables() {
     for (int i = 0; i < pixels_per_column; i++) {
-        trig_table[i] = {sinf(v_angle[i] * 2 * M_PI / 360.0f),
-                         cosf(v_angle[i] * 2 * M_PI / 360.0f),
+        trig_table[i] = {sinf(v_angle[i] * 2 * (float)M_PI / 360.0f),
+                         cosf(v_angle[i] * 2 * (float)M_PI / 360.0f),
                          h_offs[i] * 2 * (float)M_PI / 360.0f};
     }
     return true;
@@ -93,7 +93,7 @@ inline uint32_t get_encoder_count(const uint8_t* buf) {
 inline float col_h_angle(const uint8_t* col_buf) {
     uint32_t ticks;
     memcpy(&ticks, col_buf + 12, sizeof(uint32_t));
-    return (2.0 * M_PI * ticks / (float)encoder_ticks_per_rev);
+    return (2.0 * (float)M_PI * ticks / (float)encoder_ticks_per_rev);
 }
 
 // lidar pixel fields

@@ -367,19 +367,19 @@ int main(int argc, char *argv[])
 //-----------------------------------------------------------------------------
 
 #if defined(_WIN32) | defined(__WIN32__) | defined(__WIN32) | defined(_WIN64) | defined(__WIN64)
-    //SOCKET os1_cfg_socket;
-
+    // LIDAR data
     SOCKET os1_data_socket;
     SOCKADDR_IN lidar_data_sock_add = {};
     lidar_data_sock_add.sin_family = AF_INET;
     lidar_data_sock_add.sin_addr.s_addr = INADDR_ANY;
     lidar_data_sock_add.sin_port = htons(lidar_port);
 
-    SOCKET os1_imu_socket;
-    SOCKADDR_IN lidar_imu_sock_add = {};
-    lidar_imu_sock_add.sin_family = AF_INET;
-    lidar_imu_sock_add.sin_addr.s_addr = INADDR_ANY;
-    lidar_imu_sock_add.sin_port = htons(imu_port);
+    // IMU data
+    //SOCKET os1_imu_socket;
+    //SOCKADDR_IN lidar_imu_sock_add = {};
+    //lidar_imu_sock_add.sin_family = AF_INET;
+    //lidar_imu_sock_add.sin_addr.s_addr = INADDR_ANY;
+    //lidar_imu_sock_add.sin_port = htons(imu_port);
 #else
     SOCKET os1_data_socket;
     SOCKET os1_imu_socket;
