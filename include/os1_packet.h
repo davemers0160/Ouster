@@ -93,7 +93,7 @@ inline uint32_t get_encoder_count(const uint8_t* buf) {
 inline float col_h_angle(const uint8_t* col_buf) {
     uint32_t ticks;
     memcpy(&ticks, col_buf + 12, sizeof(uint32_t));
-    return (2.0 * (float)M_PI * ticks / (float)encoder_ticks_per_rev);
+    return (float)(2.0 * (float)M_PI * ticks / (float)encoder_ticks_per_rev);
 }
 
 // lidar pixel fields
