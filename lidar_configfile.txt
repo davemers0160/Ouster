@@ -7,9 +7,9 @@
 # Line 4: number of lidar captures to average
 # Line 5: save path
 
-10.127.1.175
+10.127.1.90
 7501, 7502, 7503
 10.127.1.101
 11
-D:/IUPUI/Test_Data/real_world_raw/IWM7/lidar/
-#../results/
+#D:/IUPUI/Test_Data/real_world_raw/IWM7/lidar/
+../results/

@@ -33,7 +33,8 @@ typedef int32_t SOCKET;
 
 // Custum Includes
 #include "os1_packet.h"
-#include "os1_991827000195.h"
+//#include "os1_991827000195.h"
+#include "os1_991838000603.h"
 #include "time_median.h"
 #include "sleep_ms.h"
 #include "num2string.h"
@@ -59,7 +60,9 @@ std::vector<uint32_t> index_tracker(lidar_width);
 bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::string lidar_port, std::string imu_port, std::string ip_address, std::vector<std::string> &lidar_info, std::string &error_msg)
 {
     uint32_t result;
-    std::string operation, value;
+    std::string operation;
+    std::string value;
+    std::string parameter;
     std::string message;
     std::string rx_message;
     bool success = true;
@@ -94,31 +97,92 @@ bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::strin
     }
 
     // begin configuring the lidar
-    operation = "set_udp_port_lidar";
-    result = send_message(os1_cfg_socket, (operation + " " + lidar_port), message);
+    // This is set up now for firmware v1.9+
+
+    // setup the lidar resolution
+    operation = "set_config_param";
+    parameter = "lidar_mode";
+    value = "2048x10";
+
+    result = send_message(os1_cfg_socket, (operation + " " + parameter + " " + value), message);
     receive_message(os1_cfg_socket, 64, rx_message);
     if (rx_message != operation)
     {
         success &= false;
-        error_msg = error_msg + "set_udp_port_lidar did not match\n";
+        error_msg = error_msg + operation + " " + parameter + " did not match\n";
     }
 
-    operation = "set_udp_port_imu";
-    result = send_message(os1_cfg_socket, (operation + " " + imu_port), message);
+    // set the UDP IP address
+    parameter = "udp_ip";
+    result = send_message(os1_cfg_socket, (operation + " " + parameter + " " + ip_address), message);
     receive_message(os1_cfg_socket, 64, rx_message);
     if (rx_message != operation)
     {
         success &= false;
-        error_msg = error_msg + "set_udp_port_imu did not match\n";
+        error_msg = error_msg + operation + " " + parameter + " did not match\n";
+    }    
+    
+    // set the LIDAR Port
+    parameter = "udp_port_lidar";
+    result = send_message(os1_cfg_socket, (operation + " " + parameter + " " + lidar_port), message);
+    receive_message(os1_cfg_socket, 64, rx_message);
+    if (rx_message != operation)
+    {
+        success &= false;
+        error_msg = error_msg + operation + " " + parameter + " did not match\n";
     }
 
-    operation = "set_udp_ip";
-    result = send_message(os1_cfg_socket, (operation + " " + ip_address), message);
+    // set the IMU Port
+    parameter = "udp_port_imu";
+    result = send_message(os1_cfg_socket, (operation + " " + parameter + " " + imu_port), message);
     receive_message(os1_cfg_socket, 64, rx_message);
     if (rx_message != operation)
     {
         success &= false;
-        error_msg = error_msg + "set_udp_ip did not match\n";
+        error_msg = error_msg + operation + " " + parameter + " did not match\n";
+    }
+
+    
+    // set the window_rejection_enable NARROW or STANDARD
+    parameter = "pulse_mode";
+    result = send_message(os1_cfg_socket, (operation + " " + parameter + " " + "NARROW"), message);
+    receive_message(os1_cfg_socket, 64, rx_message);
+    if (rx_message != operation)
+    {
+        success &= false;
+        error_msg = error_msg + operation + " " + parameter + " did not match\n";
+    }
+
+    // set the window_rejection_enable 
+    parameter = "window_rejection_enable";
+    result = send_message(os1_cfg_socket, (operation + " " + parameter + " " + "0"), message);
+    receive_message(os1_cfg_socket, 64, rx_message);
+    if (rx_message != operation)
+    {
+        success &= false;
+        error_msg = error_msg + operation + " " + parameter + " did not match\n";
+    }
+
+
+
+    // write the config txt
+    operation = "write_config_txt";
+    result = send_message(os1_cfg_socket, (operation), message);
+    receive_message(os1_cfg_socket, 64, rx_message);
+    if (rx_message != operation)
+    {
+        success &= false;
+        error_msg = error_msg + operation + " did not match\n";
+    }
+
+    // reinitialize the LIDAR unit witht eh changes
+    operation = "reinitialize";
+    result = send_message(os1_cfg_socket, (operation), message);
+    receive_message(os1_cfg_socket, 64, rx_message);
+    if (rx_message != operation)
+    {
+        success &= false;
+        error_msg = error_msg + operation + " did not match\n";
     }
 
     result = close_connection(os1_cfg_socket, error_msg);
@@ -484,7 +548,8 @@ int main(int argc, char *argv[])
         //receiving.detach();
 
 #endif
-
+        double ref_scale = 1.0 / 22.0;
+        double rng_scale = 1.0 / 50.0;
         char key;
         std::string depthmapWindow = "Lidar Reflectivity/Range Map";
         cv::namedWindow(depthmapWindow, cv::WINDOW_NORMAL | cv::WINDOW_KEEPRATIO);
@@ -493,8 +558,8 @@ int main(int argc, char *argv[])
             cv::Mat cm_reflect, cm_range;
             cv::Rect ROI_Rect = cv::Rect(cv::Point(905, 6), cv::Size(233,56));
 
-            reflect_px.convertTo(cm_reflect, CV_8UC1, 1 / 22.0, 0);
-            range_px.convertTo(cm_range, CV_8UC1, 1 / 90.0, 0);
+            reflect_px.convertTo(cm_reflect, CV_8UC1, ref_scale, 0);
+            range_px.convertTo(cm_range, CV_8UC1, rng_scale, 0);
 
             cv::vconcat(cm_reflect, cm_range, lidar_combined_map);
             cv::applyColorMap(lidar_combined_map, lidar_combined_map, cv::COLORMAP_JET);
@@ -528,8 +593,8 @@ int main(int argc, char *argv[])
                 for (idx = 0; idx < capture_num; ++idx)
                 {
                     std::cout << ".";
-                    reflect_px.convertTo(cm_reflect, CV_8UC1, 1 / 22.0, 0);
-                    range_px.convertTo(cm_range, CV_8UC1, 1 / 90.0, 0);
+                    reflect_px.convertTo(cm_reflect, CV_8UC1, ref_scale, 0);
+                    range_px.convertTo(cm_range, CV_8UC1, rng_scale, 0);
 
                     cv::vconcat(cm_reflect, cm_range, lidar_combined_map);
 

@@ -81,7 +81,7 @@ inline uint64_t col_timestamp(const uint8_t* col_buf) {
 inline uint32_t get_measurement_id(const uint8_t* buf) {
     uint32_t measure_id;
     memcpy(&measure_id, buf + 8, sizeof(uint32_t));
-    return measure_id;
+    return (measure_id&0x07FF);
 }
 
 inline uint32_t get_encoder_count(const uint8_t* buf) {
