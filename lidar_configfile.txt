@@ -10,6 +10,6 @@
 10.127.1.90
 7501, 7502, 7503
 10.127.1.101
-11
-#D:/IUPUI/Test_Data/real_world_raw/IWM7/lidar/
-../results/
+15
+D:/IUPUI/Test_Data/rw_raw2/s5/lidar/
+#../results/

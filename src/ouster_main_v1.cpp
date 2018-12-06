@@ -145,7 +145,7 @@ bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::strin
     
     // set the window_rejection_enable NARROW or STANDARD
     parameter = "pulse_mode";
-    result = send_message(os1_cfg_socket, (operation + " " + parameter + " " + "NARROW"), message);
+    result = send_message(os1_cfg_socket, (operation + " " + parameter + " " + "STANDARD"), message);
     receive_message(os1_cfg_socket, 64, rx_message);
     if (rx_message != operation)
     {
@@ -155,7 +155,7 @@ bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::strin
 
     // set the window_rejection_enable 
     parameter = "window_rejection_enable";
-    result = send_message(os1_cfg_socket, (operation + " " + parameter + " " + "0"), message);
+    result = send_message(os1_cfg_socket, (operation + " " + parameter + " " + "1"), message);
     receive_message(os1_cfg_socket, 64, rx_message);
     if (rx_message != operation)
     {
@@ -548,8 +548,8 @@ int main(int argc, char *argv[])
         //receiving.detach();
 
 #endif
-        double ref_scale = 1.0 / 22.0;
-        double rng_scale = 1.0 / 50.0;
+        double ref_scale = 1.0 / 20.0;
+        double rng_scale = 1.0 / 10.0;
         char key;
         std::string depthmapWindow = "Lidar Reflectivity/Range Map";
         cv::namedWindow(depthmapWindow, cv::WINDOW_NORMAL | cv::WINDOW_KEEPRATIO);
