@@ -549,7 +549,7 @@ int main(int argc, char *argv[])
 
 #endif
         double ref_scale = 1.0 / 20.0;
-        double rng_scale = 1.0 / 10.0;
+        double rng_scale = 1.0 / 35.0;
         char key;
         std::string depthmapWindow = "Lidar Reflectivity/Range Map";
         cv::namedWindow(depthmapWindow, cv::WINDOW_NORMAL | cv::WINDOW_KEEPRATIO);
