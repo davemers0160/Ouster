@@ -38,7 +38,6 @@ typedef int32_t SOCKET;
 #include "time_median.h"
 #include "sleep_ms.h"
 #include "num2string.h"
-#include "path_check.h"
 #include "file_parser.h"
 #include "get_current_time.h"
 #include "write_binary_image.h"
