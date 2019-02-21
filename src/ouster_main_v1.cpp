@@ -6,7 +6,7 @@
 #include <win_network_fcns.h>
 #include <cstdint>
 
-#else
+#elif defined(__linux__) | defined(__APPLE__)
 #include <linux_network_fcns.h>
 #include <pthread.h>
 
