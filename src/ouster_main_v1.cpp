@@ -142,7 +142,7 @@ bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::strin
     }
 
     
-    // set the window_rejection_enable NARROW or STANDARD
+    // set the window_rejection_enable NARROW or STANDARD -> default STNADARD
     parameter = "pulse_mode";
     result = send_message(os1_cfg_socket, (operation + " " + parameter + " " + "STANDARD"), message);
     receive_message(os1_cfg_socket, 64, rx_message);
@@ -152,7 +152,7 @@ bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::strin
         error_msg = error_msg + operation + " " + parameter + " did not match\n";
     }
 
-    // set the window_rejection_enable 
+    // set the window_rejection_enable -> defalut "1"
     parameter = "window_rejection_enable";
     result = send_message(os1_cfg_socket, (operation + " " + parameter + " " + "1"), message);
     receive_message(os1_cfg_socket, 64, rx_message);
