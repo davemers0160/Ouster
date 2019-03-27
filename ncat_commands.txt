@@ -1,0 +1,11 @@
+# ncat LIDAR commands
+
+# connect to the LIDAR IP port
+ncat -v 10.127.1.90 7501
+
+
+# get an active parameter
+get_config_param active pulse_mode
+
+
+

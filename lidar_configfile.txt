@@ -11,5 +11,5 @@
 7501, 7502, 7503
 10.127.1.101
 10
-#D:/IUPUI/Test_Data/rw_raw3/k31/lidar/
-../results/
+D:/IUPUI/Test_Data/rw_raw4/align03/lidar/
+#../results/

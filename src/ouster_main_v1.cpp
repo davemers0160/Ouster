@@ -16,6 +16,7 @@ typedef int32_t SOCKET;
 #endif
 
 #include <cstdio>
+#include <cmath>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
@@ -48,12 +49,17 @@ namespace OS1 = ouster::OS1;
 bool running = false;
 const uint32_t packet_size = 12608;
 const uint32_t lidar_width = 2048;
-const uint32_t lidar_height = 64;
+const uint32_t lidar_height = OS1::pixels_per_column;
+
 cv::Mat range_px = cv::Mat(lidar_height, lidar_width, CV_32SC1, cv::Scalar::all(0));
+cv::Mat range_data = cv::Mat(lidar_height, lidar_width, CV_32FC1, cv::Scalar::all(0));
 cv::Mat reflect_px = cv::Mat(lidar_height, lidar_width, CV_32SC1, cv::Scalar::all(0));
+
 //cv::Mat_<uint32_t> lidar_range_map = cv::Mat_<uint32_t>(lidar_height, lidar_width, (const uint32_t)0);
 //cv::Mat lidar_azimuth = cv::Mat(lidar_height, 1, CV_32FC1, cv::Scalar::all(0));
+
 std::vector<uint32_t> index_tracker(lidar_width);
+std::vector<ouster::OS1::trig_table_entry> trig_table;
 //-----------------------------------------------------------------------------
 
 bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::string lidar_port, std::string imu_port, std::string ip_address, std::vector<std::string> &lidar_info, std::string &error_msg)
@@ -82,7 +88,7 @@ bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::strin
     // get the basic info about the lidar unit
     operation = "get_sensor_info";
     result = send_message(os1_cfg_socket, operation, message);
-    receive_message(os1_cfg_socket, 305, rx_message);
+    receive_message(os1_cfg_socket, 312, rx_message);
     if (rx_message.length() > 0)
     {
         std::vector<std::string> params, params2;
@@ -140,17 +146,17 @@ bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::strin
         success &= false;
         error_msg = error_msg + operation + " " + parameter + " did not match\n";
     }
-
-    
+   
     // set the window_rejection_enable NARROW or STANDARD -> default STNADARD
-    parameter = "pulse_mode";
-    result = send_message(os1_cfg_socket, (operation + " " + parameter + " " + "STANDARD"), message);
-    receive_message(os1_cfg_socket, 64, rx_message);
-    if (rx_message != operation)
-    {
-        success &= false;
-        error_msg = error_msg + operation + " " + parameter + " did not match\n";
-    }
+    // removed in firmware update 1.10.0
+    //parameter = "pulse_mode";
+    //result = send_message(os1_cfg_socket, (operation + " " + parameter + " " + "STANDARD"), message);
+    //receive_message(os1_cfg_socket, 64, rx_message);
+    //if (rx_message != operation)
+    //{
+    //    success &= false;
+    //    error_msg = error_msg + operation + " " + parameter + " did not match\n";
+    //}
 
     // set the window_rejection_enable -> defalut "1"
     parameter = "window_rejection_enable";
@@ -161,8 +167,6 @@ bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::strin
         success &= false;
         error_msg = error_msg + operation + " " + parameter + " did not match\n";
     }
-
-
 
     // write the config txt
     operation = "write_config_txt";
@@ -262,9 +266,14 @@ void *get_lidar_packet(void *input)
 
     uint8_t lidar_packet[packet_size+1];
     int32_t result, error;
-    uint32_t measurement_id, range, reflect;
+    uint32_t measurement_id, encoder_count, reflect;
     uint32_t index = 0;
     uint32_t col_idx = 0;
+    double range = 0,  x = 0.0, y = 0.0, z = 0.0;
+    double theta = 0.0;
+
+    const double pi_2_encoder = (2.0*M_PI) / ((double)OS1::encoder_ticks_per_rev);
+
     //uint32_t encoder;
 
     do 
@@ -288,19 +297,29 @@ void *get_lidar_packet(void *input)
         {
             col_idx = col * OS1::column_bytes;
             measurement_id = OS1::get_measurement_id(&lidar_packet[col_idx]);
+            encoder_count = OS1::get_encoder_count(&lidar_packet[col_idx]);
+
             index_tracker[measurement_id] = 1;
             for (uint32_t row = 0; row < lidar_height; ++row)
             {
                 index = col_idx + (row * OS1::pixel_bytes) + 16;
-                range = OS1::px_range(&lidar_packet[index]);
+                range = (double)OS1::px_range(&lidar_packet[index]);
                 reflect = OS1::px_reflectivity(&lidar_packet[index]);
                 
+                //theta = (pi_2_encoder*(double)encoder_count) + trig_table[row].h_offs;
+                //x = range * cos(theta) * trig_table[row].sin_v_angle;
+                //y = -range * sin(theta) * trig_table[row].cos_v_angle;
+                //z = range * trig_table[row].sin_v_angle;
+                //range_data.at<float>(row, (measurement_id + beam_azimuth_index[row] + 2048) % 2048) = (float)abs(x);
+
                 range_px.at<int32_t>(row, (measurement_id + beam_azimuth_index[row] + 2048) % 2048) = (int32_t)range;
                 reflect_px.at<int32_t>(row, (measurement_id + beam_azimuth_index[row] + 2048) % 2048) = (int32_t)reflect;
                 //lidar_range_map.at<int32_t>(row, (measurement_id)) = (int32_t)range;
             }
 
         }
+
+        sleep_ms(3);
 
     } while (running == true);
 
@@ -464,17 +483,19 @@ int main(int argc, char *argv[])
 
 #if defined(_WIN32) | defined(__WIN32__) | defined(__WIN32) | defined(_WIN64) | defined(__WIN64)
         // config the lidar to start sending lidar packets
+        std::cout << "Configuring LIDAR: ";
         bool success = config_lidar(os1_address, config_port, std::to_string(lidar_port), std::to_string(imu_port), rx_address, lidar_info, error_msg);
         if (success == false)
         {
-            std::cout << "Lidar configuration failed..." << std::endl;
+            std::cout << "Failed!" << std::endl;
             std::cout << error_msg << std::endl;
             DataLogStream << error_msg << std::endl;
             DataLogStream.close();
             std::cin.ignore();
             return -1;
         }
-        std::cout << "Configuring lidar successful!" << std::endl;
+        std::cout <<  "Successful!" << std::endl;
+        
         if (lidar_info.size() > 3)
         {
             std::cout << "Connected to lidar sn: " << lidar_info[2] << std::endl;
@@ -484,10 +505,16 @@ int main(int argc, char *argv[])
 
         std::cout << std::endl;
 
+        // initialize the trig table
+        init_trig_table(trig_table);
+
+
         // initialize the lidar socket stream
+        std::cout << "Initializing Socket: ";
         result = init_udp_socket(lidar_port, lidar_data_sock_add, os1_data_socket, error_msg);
         if (result != 0)
         {
+            std::cout << "Failed!" << std::endl;
             std::cout << "Error Code: " << result << " - " << error_msg << std::endl;
             DataLogStream << error_msg << std::endl;
             DataLogStream.close(); 
@@ -495,7 +522,7 @@ int main(int argc, char *argv[])
             return -1;
         }
 
-        std::cout << "Socket initialization successful." << std::endl << std::endl;
+        std::cout << "Successful!" << std::endl << std::endl;
 
         running = true;
         std::thread receiving(get_lidar_packet, os1_data_socket);
@@ -548,10 +575,18 @@ int main(int argc, char *argv[])
 
 #endif
         double ref_scale = 1.0 / 20.0;
-        double rng_scale = 1.0 / 35.0;
+        double rng_scale = 1.0 / 30.0;
         char key;
+
         std::string depthmapWindow = "Lidar Reflectivity/Range Map";
         cv::namedWindow(depthmapWindow, cv::WINDOW_NORMAL | cv::WINDOW_KEEPRATIO);
+
+        std::cout << "------------------------------------------------------------------" << std::endl;
+        std::cout << "Press the following keys to perform actions:" << std::endl;
+        std::cout << "  s - Save an image" << std::endl;
+        std::cout << "  q - Quit" << std::endl;
+        std::cout << "------------------------------------------------------------------" << std::endl << std::endl;
+
         do
         {
             cv::Mat cm_reflect, cm_range;
@@ -559,6 +594,7 @@ int main(int argc, char *argv[])
 
             reflect_px.convertTo(cm_reflect, CV_8UC1, ref_scale, 0);
             range_px.convertTo(cm_range, CV_8UC1, rng_scale, 0);
+            //range_data.convertTo(cm_range, CV_8UC1, rng_scale, 0);
 
             cv::vconcat(cm_reflect, cm_range, lidar_combined_map);
             cv::applyColorMap(lidar_combined_map, lidar_combined_map, cv::COLORMAP_JET);
@@ -574,6 +610,7 @@ int main(int argc, char *argv[])
             if (key == 's')
             {
                 cv::Mat sum_image = cv::Mat(cv::Size(lidar_width, lidar_height), CV_32SC1, cv::Scalar::all(0));
+                //cv::Mat sum_image = cv::Mat(cv::Size(lidar_width, lidar_height), CV_32FC1, cv::Scalar::all(0));
 
                 std::vector<cv::Mat> rng_tm, ref_tm;
                 get_current_time(sdate, stime);
@@ -594,6 +631,7 @@ int main(int argc, char *argv[])
                     std::cout << ".";
                     reflect_px.convertTo(cm_reflect, CV_8UC1, ref_scale, 0);
                     range_px.convertTo(cm_range, CV_8UC1, rng_scale, 0);
+                    //range_data.convertTo(cm_range, CV_8UC1, rng_scale, 0);
 
                     cv::vconcat(cm_reflect, cm_range, lidar_combined_map);
 
@@ -610,10 +648,12 @@ int main(int argc, char *argv[])
                         tracker_sum = std::accumulate(index_tracker.begin(), index_tracker.end(), (int32_t)0);
                     }
 
-                    rng_tm.push_back(range_px.clone());
+                    //rng_tm.push_back(range_px.clone());
+                    //rng_tm.push_back(range_data.clone());
                     ref_tm.push_back(reflect_px.clone());
 
                     cv::add(sum_image, range_px, sum_image, cv::Mat(), CV_32SC1);
+                    //cv::add(sum_image, range_data, sum_image, cv::Mat(), CV_32FC1);
 
                     // reset the tracker
                     std::fill(index_tracker.begin(), index_tracker.end(), 0);
@@ -626,6 +666,7 @@ int main(int argc, char *argv[])
                 std::cout << "------------------------------------------------------------------" << std::endl;
                 
                 sum_image.convertTo(rng_tm2, CV_32SC1, (1 / (double)capture_num));
+                //sum_image.convertTo(rng_tm2, CV_32FC1, (1 / (double)capture_num));
                 //cv::medianBlur(sum_image, sum_image, 3);
 
                 //time_median_cv(rng_tm, rng_tm2);
@@ -639,6 +680,7 @@ int main(int argc, char *argv[])
 
                 // write the data
                 fwrite(rng_tm2.data, sizeof(int32_t), rng_tm2.rows*rng_tm2.cols, FP1);
+                //fwrite(rng_tm2.data, sizeof(float), rng_tm2.rows*rng_tm2.cols, FP1);
                 fwrite(ref_tm2.data, sizeof(int32_t), ref_tm2.rows*ref_tm2.cols, FP2);
 
                 fclose(FP1);

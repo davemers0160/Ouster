@@ -23,7 +23,9 @@ const int column_bytes = 16 + (pixels_per_column * pixel_bytes) + 4;
 
 const int encoder_ticks_per_rev = 90112;
 
-const float v_angle[pixels_per_column] = {
+//const double pi_2_encoder = (2.0*M_PI) / ((double)encoder_ticks_per_rev);
+
+const double v_angle[pixels_per_column] = {
     16.611,  16.084,  15.557,  15.029,  14.502,  13.975,  13.447,  12.920,
     12.393,  11.865,  11.338,  10.811,  10.283,  9.756,   9.229,   8.701,
     8.174,   7.646,   7.119,   6.592,   6.064,   5.537,   5.010,   4.482,
@@ -34,7 +36,7 @@ const float v_angle[pixels_per_column] = {
     -12.920, -13.447, -13.975, -14.502, -15.029, -15.557, -16.084, -16.611,
 };
 
-const float h_offs[pixels_per_column] = {
+const double h_offs[pixels_per_column] = {
     3.164, 1.055, -1.055, -3.164, 3.164, 1.055, -1.055, -3.164,
     3.164, 1.055, -1.055, -3.164, 3.164, 1.055, -1.055, -3.164,
     3.164, 1.055, -1.055, -3.164, 3.164, 1.055, -1.055, -3.164,
@@ -46,9 +48,9 @@ const float h_offs[pixels_per_column] = {
 };
 
 struct trig_table_entry {
-    float sin_v_angle;
-    float cos_v_angle;
-    float h_offs;
+    double sin_v_angle;
+    double cos_v_angle;
+    double h_offs;
 };
 
 // table of vertical angle cos, sin, and horizontal offset of each pixel
@@ -58,9 +60,9 @@ static trig_table_entry trig_table[pixels_per_column];
 
 static bool init_tables() {
     for (int i = 0; i < pixels_per_column; i++) {
-        trig_table[i] = {sinf(v_angle[i] * 2 * (float)M_PI / 360.0f),
-                         cosf(v_angle[i] * 2 * (float)M_PI / 360.0f),
-                         h_offs[i] * 2 * (float)M_PI / 360.0f};
+        trig_table[i] = {sinf(v_angle[i] * 2 * (double)M_PI / 360.0f),
+                         cosf(v_angle[i] * 2 * (double)M_PI / 360.0f),
+                         h_offs[i] * 2 * (double)M_PI / 360.0f};
     }
     return true;
 }

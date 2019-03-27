@@ -2,6 +2,7 @@
 #define _OS1_991838000603_H
 
 #include <cstdint>
+#include <cmath>
 #include "os1_packet.h"
 
 const double beam_altitude_angles[ouster::OS1::pixels_per_column] = {
@@ -38,5 +39,24 @@ const int32_t beam_azimuth_index[ouster::OS1::pixels_per_column] = {
 };
 
 const double lidar_intrinsics[] = {-1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 36.18, 0, 0, 0, 1};
+
+
+
+static bool init_trig_table(std::vector<ouster::OS1::trig_table_entry> &trig_table)
+{
+    double m_pi_180 = (double)M_PI / 180.0;
+    trig_table.clear();
+
+    for (uint32_t idx = 0; idx < ouster::OS1::pixels_per_column; ++idx)
+    {
+        trig_table.push_back({ sin(beam_altitude_angles[idx] * m_pi_180),
+                               cos(beam_altitude_angles[idx] * m_pi_180),
+                               beam_azimuth_angles[idx] * m_pi_180 });
+    }
+    return true;
+}
+
+
+
 
 #endif 	//_OS1_991838000603_H
