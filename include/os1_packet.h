@@ -60,9 +60,9 @@ static trig_table_entry trig_table[pixels_per_column];
 
 static bool init_tables() {
     for (int i = 0; i < pixels_per_column; i++) {
-        trig_table[i] = {sinf(v_angle[i] * 2 * (double)M_PI / 360.0f),
-                         cosf(v_angle[i] * 2 * (double)M_PI / 360.0f),
-                         h_offs[i] * 2 * (double)M_PI / 360.0f};
+        trig_table[i] = {std::sin(v_angle[i] * 2.0 * (double)M_PI / 360.0),
+                         std::cos(v_angle[i] * 2.0 * (double)M_PI / 360.0),
+                         h_offs[i] * 2.0 * (double)M_PI / 360.0};
     }
     return true;
 }

@@ -42,6 +42,7 @@ typedef int32_t SOCKET;
 #include "file_parser.h"
 #include "get_current_time.h"
 #include "write_binary_image.h"
+#include "modulo.h"
 
 namespace OS1 = ouster::OS1;
 
@@ -160,7 +161,7 @@ bool config_lidar(std::string lidar_ip_address, uint32_t config_port, std::strin
 
     // set the window_rejection_enable -> defalut "1"
     parameter = "window_rejection_enable";
-    result = send_message(os1_cfg_socket, (operation + " " + parameter + " " + "1"), message);
+    result = send_message(os1_cfg_socket, (operation + " " + parameter + " " + "0"), message);
     receive_message(os1_cfg_socket, 64, rx_message);
     if (rx_message != operation)
     {
@@ -265,8 +266,8 @@ void *get_lidar_packet(void *input)
 #endif
 
     uint8_t lidar_packet[packet_size+1];
-    int32_t result, error;
-    uint32_t measurement_id, encoder_count, reflect;
+    int32_t result, error, measurement_id;
+    uint32_t encoder_count, reflect;
     uint32_t index = 0;
     uint32_t col_idx = 0;
     double range = 0,  x = 0.0, y = 0.0, z = 0.0;
@@ -296,7 +297,7 @@ void *get_lidar_packet(void *input)
         for (uint32_t col = 0; col < 16; ++col)
         {
             col_idx = col * OS1::column_bytes;
-            measurement_id = OS1::get_measurement_id(&lidar_packet[col_idx]);
+            measurement_id = (int32_t)OS1::get_measurement_id(&lidar_packet[col_idx]);
             encoder_count = OS1::get_encoder_count(&lidar_packet[col_idx]);
 
             index_tracker[measurement_id] = 1;
@@ -312,8 +313,8 @@ void *get_lidar_packet(void *input)
                 //z = range * trig_table[row].sin_v_angle;
                 //range_data.at<float>(row, (measurement_id + beam_azimuth_index[row] + 2048) % 2048) = (float)abs(x);
 
-                range_px.at<int32_t>(row, (measurement_id + beam_azimuth_index[row] + 2048) % 2048) = (int32_t)range;
-                reflect_px.at<int32_t>(row, (measurement_id + beam_azimuth_index[row] + 2048) % 2048) = (int32_t)reflect;
+                range_px.at<int32_t>(row, (int32_t)mod((measurement_id + beam_azimuth_index[row]), 2048)) = (int32_t)range;
+                reflect_px.at<int32_t>(row, (int32_t)mod((measurement_id + beam_azimuth_index[row]), 2048)) = (int32_t)reflect;
                 //lidar_range_map.at<int32_t>(row, (measurement_id)) = (int32_t)range;
             }
 
