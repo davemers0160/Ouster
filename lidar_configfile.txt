@@ -11,5 +11,5 @@
 7501, 7502, 7503
 10.127.1.101
 5
-#D:/IUPUI/Test_Data/rw_raw4/align03/lidar/
-../results/pinecone/
+D:/IUPUI/Test_Data/rw_raw4/k64/lidar/
+#../results/pinecone/
