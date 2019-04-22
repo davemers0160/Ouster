@@ -320,7 +320,7 @@ void *get_lidar_packet(void *input)
 
         }
 
-        sleep_ms(3);
+        //sleep_ms(11);
 
     } while (running == true);
 
